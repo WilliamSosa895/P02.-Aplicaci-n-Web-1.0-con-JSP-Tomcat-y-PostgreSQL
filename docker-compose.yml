@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dsw
+      POSTGRES_USER: dsw
+      POSTGRES_PASSWORD: dsw_local
+    ports: ["15432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dsw -d dsw"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    command: ["mosquitto", "-c", "/mosquitto-no-auth.conf"]
+    ports: ["11883:1883"]
+  web1:
+    profiles: ["web1"]
+    build: ./web1-jsp
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/dsw
+      DB_USER: dsw
+      DB_PASSWORD: dsw_local
+    depends_on:
+      postgres: {condition: service_healthy}
+    ports: ["18081:8080"]
+  web2:
+    profiles: ["web2"]
+    build: ./web2-jsf
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/dsw
+      DB_USER: dsw
+      DB_PASSWORD: dsw_local
+    depends_on:
+      postgres: {condition: service_healthy}
+    ports: ["18082:8080"]
+  api:
+    profiles: ["web3", "web4"]
+    build: ./api-spring
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/dsw
+      DB_USER: dsw
+      DB_PASSWORD: dsw_local
+      LAB_API_KEY: lab-only-key
+    depends_on:
+      postgres: {condition: service_healthy}
+    ports: ["18080:8080"]
+  frontend:
+    profiles: ["web3", "web4"]
+    build: ./frontend-angular
+    depends_on: [api]
+    ports: ["18088:80"]
+  mqtt-bridge:
+    profiles: ["web4"]
+    build: ./iot-simulator
+    environment:
+      MQTT_HOST: mosquitto
+      API_URL: http://api:8080/api/telemetry
+      LAB_API_KEY: lab-only-key
+    depends_on: [mosquitto, api]

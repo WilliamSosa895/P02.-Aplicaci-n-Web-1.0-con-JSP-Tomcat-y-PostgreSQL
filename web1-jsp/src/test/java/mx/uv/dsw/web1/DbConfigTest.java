@@ -1,0 +1,1 @@
+package mx.uv.dsw.web1; import static org.junit.jupiter.api.Assertions.*; import org.junit.jupiter.api.Test; class DbConfigTest {@Test void usaUrlJdbcPostgres(){assertTrue(DbConfig.url().startsWith("jdbc:postgresql://"));}}

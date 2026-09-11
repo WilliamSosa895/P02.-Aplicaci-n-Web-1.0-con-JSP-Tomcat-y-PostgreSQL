@@ -1,0 +1,7 @@
+FROM maven:3.9.9-eclipse-temurin-11 AS build
+WORKDIR /src
+COPY . .
+RUN mvn -q package
+FROM tomcat:9.0-jdk11-temurin
+RUN rm -rf /usr/local/tomcat/webapps/*
+COPY --from=build /src/target/web2.war /usr/local/tomcat/webapps/web2.war

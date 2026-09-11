@@ -1,0 +1,19 @@
+.DS_Store
+
+# Java/Maven build output
+target/
+
+# Angular/Node build output and dependencies
+node_modules/
+dist/
+.angular/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# IDE metadata
+.idea/
+*.iml
+.vscode/
