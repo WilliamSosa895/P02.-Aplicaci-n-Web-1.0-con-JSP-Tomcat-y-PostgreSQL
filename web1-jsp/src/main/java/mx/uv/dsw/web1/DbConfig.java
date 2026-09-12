@@ -19,6 +19,6 @@ public final class DbConfig {
     }
 
     public static String password() {
-        return System.getenv().getOrDefault("DB_PASSWORD", "postgres");
+        return System.getenv().getOrDefault("DB_PASSWORD", "190304");
     }
 }
