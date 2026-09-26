@@ -1,1 +1,65 @@
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xmlns:h="http://xmlns.jcp.org/jsf/html" xmlns:p="http://primefaces.org/ui"><h:head><title>Web 2.0</title></h:head><h:body><h1>Registro interactivo</h1><h:form id="form"><p:messages/><p:outputLabel for="nombre" value="Nombre"/><p:inputText id="nombre" value="#{registroBean.nombre}" required="true" minlength="3"/><p:commandButton value="Guardar" action="#{registroBean.guardar}" process="form" update="form"/><p:dataTable value="#{registroBean.registros}" var="registro" emptyMessage="Sin registros"><p:column headerText="Nombre"><h:outputText value="#{registro}"/></p:column></p:dataTable></h:form></h:body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:f="http://xmlns.jcp.org/jsf/core"
+      xmlns:p="http://primefaces.org/ui">
+<h:head>
+    <title>PR10 - Registro de practicas (Web 2.0)</title>
+    <style>
+        body { margin: 0; }
+        .contenedor { max-width: 900px; margin: 1.5rem auto; padding: 0 1rem;
+                      font-family: system-ui, Arial, sans-serif; }
+        .campos { display: grid; gap: .8rem; max-width: 520px; margin: 1rem 0; }
+        h1 { font-size: 1.3rem; } h2 { font-size: 1.05rem; margin-top: 1.5rem; }
+        .pie { margin-top: 1.5rem; font-size: .85rem; color: #666; }
+    </style>
+</h:head>
+<h:body>
+    <div class="contenedor">
+        <h1>PR10 - Gestion de practicas profesionales</h1>
+        <p>Incremento Web 2.0 (JSF + PrimeFaces). Registro interactivo de postulaciones. Datos ficticios.</p>
+
+        <p:growl id="avisos" showDetail="true" life="4000"/>
+
+        <h:form id="form">
+            <h2>Registrar postulacion</h2>
+            <div class="campos">
+                <p:outputLabel for="nombre" value="Titulo de la practica"/>
+                <p:inputText id="nombre" value="#{registroBean.nombre}" required="true"
+                             requiredMessage="El titulo es obligatorio."
+                             validatorMessage="El titulo debe tener al menos 3 caracteres.">
+                    <f:validateLength minimum="3" maximum="100"/>
+                </p:inputText>
+
+                <p:outputLabel for="estado" value="Estado"/>
+                <p:selectOneMenu id="estado" value="#{registroBean.estado}" required="true"
+                                 requiredMessage="Seleccione un estado.">
+                    <f:selectItem itemLabel="Seleccione..." itemValue="#{null}" noSelectionOption="true"/>
+                    <f:selectItems value="#{registroBean.estados}"/>
+                </p:selectOneMenu>
+
+                <p:outputLabel for="detalle" value="Detalle (opcional)"/>
+                <p:inputTextarea id="detalle" value="#{registroBean.detalle}" rows="2"
+                                 counter="cnt" maxlength="300"/>
+                <h:outputText id="cnt"/>
+
+                <p:commandButton value="Guardar" action="#{registroBean.guardar}"
+                                 process="@form" update="@form :avisos :tabla:dt"/>
+            </div>
+        </h:form>
+
+        <h:form id="tabla">
+            <h2>Postulaciones registradas</h2>
+            <p:dataTable value="#{registroBean.registros}" var="r" emptyMessage="Sin registros"
+                         paginator="true" rows="10" id="dt">
+                <p:column headerText="ID">#{r.id}</p:column>
+                <p:column headerText="Titulo">#{r.nombre}</p:column>
+                <p:column headerText="Estado">#{r.estado}</p:column>
+                <p:column headerText="Detalle">#{r.detalle}</p:column>
+            </p:dataTable>
+        </h:form>
+
+        <p class="pie">Proyecto PR10 - Equipo 4 - Trazabilidad con P02 (mismo dominio y base PostgreSQL).</p>
+    </div>
+</h:body>
+</html>
