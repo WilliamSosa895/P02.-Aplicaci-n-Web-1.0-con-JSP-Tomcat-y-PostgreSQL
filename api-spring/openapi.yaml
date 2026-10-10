@@ -1,0 +1,111 @@
+openapi: 3.0.3
+info:
+  title: PR10 - API de Prácticas Profesionales (Web 3.0)
+  description: >
+    Contrato REST del recurso principal del proyecto PR10 (practica) y de los
+    catalogos relacionados (organizaciones y estudiantes). Backend Spring Boot
+    (Java 11) sobre PostgreSQL. Datos ficticios; la clave de laboratorio no es un
+    secreto real y solo habilita operaciones de escritura en el entorno local.
+  version: 1.1.0
+servers:
+  - url: http://localhost:18080
+    description: API en contenedor (perfil web3)
+  - url: http://localhost:8080
+    description: API local (mvn spring-boot:run)
+paths:
+  /api/practicas:
+    get:
+      summary: Lista las prácticas registradas
+      responses:
+        '200':
+          description: Lista de prácticas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Practica' }
+    post:
+      summary: Registra una práctica (requiere clave de laboratorio)
+      parameters:
+        - in: header
+          name: X-Lab-Key
+          required: true
+          schema: { type: string }
+          description: Clave de laboratorio; sin ella la operación se rechaza con 401.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PracticaInput' }
+      responses:
+        '201':
+          description: Práctica creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Practica' }
+        '400':
+          description: Cuerpo inválido (ids obligatorios, título o estado no permitido)
+        '401':
+          description: Falta o es incorrecta la cabecera X-Lab-Key
+  /api/practicas/health:
+    get:
+      summary: Sonda de salud del servicio
+      responses:
+        '200':
+          description: Servicio disponible
+          content:
+            text/plain: { schema: { type: string, example: UP } }
+  /api/organizaciones:
+    get:
+      summary: Lista las organizaciones (catálogo)
+      responses:
+        '200':
+          description: Lista de organizaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Organizacion' }
+  /api/estudiantes:
+    get:
+      summary: Lista los estudiantes ficticios (catálogo)
+      responses:
+        '200':
+          description: Lista de estudiantes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Estudiante' }
+components:
+  schemas:
+    PracticaInput:
+      type: object
+      required: [organizacionId, estudianteId, titulo, estado]
+      properties:
+        organizacionId: { type: integer, format: int64, example: 1, description: Referencia a organizacion.id }
+        estudianteId:   { type: integer, format: int64, example: 1, description: Referencia a estudiante_ficticio.id }
+        titulo:         { type: string, minLength: 3, maxLength: 120, example: "Práctica de desarrollo web" }
+        estado:
+          type: string
+          enum: [POSTULADA, ACEPTADA, EN_CURSO, CONCLUIDA, RECHAZADA]
+          example: POSTULADA
+    Practica:
+      allOf:
+        - $ref: '#/components/schemas/PracticaInput'
+        - type: object
+          properties:
+            id:       { type: integer, format: int64, example: 1 }
+            creadaEn: { type: string, format: date-time }
+    Organizacion:
+      type: object
+      properties:
+        id:     { type: integer, format: int64 }
+        nombre: { type: string, example: "Consultora Delta (ficticia)" }
+        sector: { type: string, example: "Consultoría TI" }
+    Estudiante:
+      type: object
+      properties:
+        id:       { type: integer, format: int64 }
+        nombre:   { type: string, example: "Ana Estudiante Ficticia" }
+        programa: { type: string, example: "Ingeniería de Software" }
