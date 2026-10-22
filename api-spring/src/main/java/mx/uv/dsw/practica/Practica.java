@@ -14,7 +14,7 @@ import javax.validation.constraints.Size;
 /**
  * Recurso principal del dominio PR10: la practica (postulacion). Se relaciona
  * con organizacion y estudiante mediante sus identificadores; la integridad
- * referencial se define en el modelo PostgreSQL (llaves foraneas en db/schema.sql).
+ * referencial se define en el modelo PostgreSQL (llaves foraneas en migracion Flyway V1__esquema_inicial.sql).
  */
 @Entity
 public class Practica {

@@ -7,7 +7,7 @@ Angular–API–PostgreSQL es **P05**. Datos ficticios; sin credenciales en el r
 ## Modelo (6 entidades, coherente con P02)
 `organizacion`, `estudiante_ficticio`, `practica`, `avance`, `evidencia`, `evento_plazo`,
 relacionadas por llaves foráneas. La `practica` es el recurso principal y referencia a
-`organizacion` y `estudiante_ficticio`. Modelo completo: `db/schema.sql`.
+`organizacion` y `estudiante_ficticio`. Modelo completo: `api-spring/src/main/resources/db/migration/V1__esquema_inicial.sql`.
 El recurso de referencia `telemetry` se conserva intacto para no romper la verificación.
 
 ## Contrato
@@ -18,7 +18,7 @@ El recurso de referencia `telemetry` se conserva intacto para no romper la verif
 - `GET  /api/estudiantes` → 200 (catálogo)
 
 La creación referencia a la organización y al estudiante por id (`organizacionId`,
-`estudianteId`). La integridad referencial (FK) se define en `db/schema.sql`.
+`estudianteId`). La integridad referencial (FK) se define en la migracion Flyway `V1__esquema_inicial.sql`.
 Contrato completo: `api-spring/openapi.yaml`.
 
 ## Compilar y probar (Java 11 + Maven)
