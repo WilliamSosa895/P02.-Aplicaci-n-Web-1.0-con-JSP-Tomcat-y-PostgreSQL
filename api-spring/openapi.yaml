@@ -6,7 +6,7 @@ info:
     catalogos relacionados (organizaciones y estudiantes). Backend Spring Boot
     (Java 11) sobre PostgreSQL. Datos ficticios; la clave de laboratorio no es un
     secreto real y solo habilita operaciones de escritura en el entorno local.
-  version: 1.1.0
+  version: 1.2.0
 servers:
   - url: http://localhost:18080
     description: API en contenedor (perfil web3)
@@ -55,6 +55,48 @@ paths:
           description: Servicio disponible
           content:
             text/plain: { schema: { type: string, example: UP } }
+  /api/practicas/{id}:
+    get:
+      summary: Consulta una práctica por id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Práctica encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Practica' }
+        '404':
+          description: La práctica no existe
+  /api/practicas/{id}/estado:
+    patch:
+      summary: Cambia el estado de una práctica (requiere clave de laboratorio)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+        - in: header
+          name: X-Lab-Key
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CambioEstado' }
+      responses:
+        '200':
+          description: Estado actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Practica' }
+        '400': { description: Estado inválido }
+        '401': { description: Falta o es incorrecta la cabecera X-Lab-Key }
+        '404': { description: La práctica no existe }
   /api/organizaciones:
     get:
       summary: Lista las organizaciones (catálogo)
@@ -97,6 +139,14 @@ components:
           properties:
             id:       { type: integer, format: int64, example: 1 }
             creadaEn: { type: string, format: date-time }
+    CambioEstado:
+      type: object
+      required: [estado]
+      properties:
+        estado:
+          type: string
+          enum: [POSTULADA, ACEPTADA, EN_CURSO, CONCLUIDA, RECHAZADA]
+          example: ACEPTADA
     Organizacion:
       type: object
       properties:

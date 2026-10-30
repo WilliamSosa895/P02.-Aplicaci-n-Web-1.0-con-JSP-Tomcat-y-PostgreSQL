@@ -25,8 +25,8 @@ const ESTADOS = ['POSTULADA', 'ACEPTADA', 'EN_CURSO', 'CONCLUIDA', 'RECHAZADA'];
   imports: [CommonModule, FormsModule],
   template: `
     <main>
-      <h1>PR10 — Prácticas profesionales (Web 3.0)</h1>
-      <p>Cliente Angular que consume la API REST de prácticas.</p>
+      <h1>PR10 — Prácticas profesionales</h1>
+      <p>Cliente Angular integrado con la API REST (Spring Boot) y PostgreSQL.</p>
 
       <section>
         <h2>Registrar práctica</h2>
@@ -60,14 +60,24 @@ const ESTADOS = ['POSTULADA', 'ACEPTADA', 'EN_CURSO', 'CONCLUIDA', 'RECHAZADA'];
         <h2>Prácticas registradas</h2>
         <button (click)="load()">Actualizar</button>
         <table>
-          <tr><th>ID</th><th>Organización</th><th>Estudiante</th><th>Título</th><th>Estado</th></tr>
+          <tr>
+            <th>ID</th><th>Organización</th><th>Estudiante</th><th>Título</th>
+            <th>Estado</th><th>Cambiar estado</th>
+          </tr>
           <tr *ngFor="let p of items">
             <td>{{ p.id }}</td>
             <td>{{ nombreOrg(p.organizacionId) }}</td>
             <td>{{ nombreEst(p.estudianteId) }}</td>
-            <td>{{ p.titulo }}</td><td>{{ p.estado }}</td>
+            <td>{{ p.titulo }}</td>
+            <td>{{ p.estado }}</td>
+            <td class="acciones">
+              <select [(ngModel)]="seleccion[p.id!]">
+                <option *ngFor="let s of estados" [value]="s">{{ s }}</option>
+              </select>
+              <button (click)="cambiarEstado(p)">Aplicar</button>
+            </td>
           </tr>
-          <tr *ngIf="items.length === 0"><td colspan="5">Sin prácticas registradas.</td></tr>
+          <tr *ngIf="items.length === 0"><td colspan="6">Sin prácticas registradas.</td></tr>
         </table>
       </section>
     </main>
@@ -78,6 +88,7 @@ class App implements OnInit {
   organizaciones: Organizacion[] = [];
   estudiantes: Estudiante[] = [];
   estados = ESTADOS;
+  seleccion: Record<number, string> = {};
   nueva: Practica = { organizacionId: null, estudianteId: null, titulo: '', estado: '' };
   error = '';
   ok = '';
@@ -95,9 +106,16 @@ class App implements OnInit {
     this.load();
   }
 
+  private headers(): HttpHeaders {
+    return new HttpHeaders({ 'X-Lab-Key': LAB_KEY, 'Content-Type': 'application/json' });
+  }
+
   load(): void {
     this.http.get<Practica[]>('/api/practicas').subscribe({
-      next: v => { this.items = v; },
+      next: v => {
+        this.items = v;
+        v.forEach(p => { if (p.id != null) this.seleccion[p.id] = p.estado; });
+      },
       error: () => { this.error = 'No fue posible consultar la API.'; },
     });
   }
@@ -105,19 +123,32 @@ class App implements OnInit {
   crear(): void {
     this.error = '';
     this.ok = '';
-    const headers = new HttpHeaders({ 'X-Lab-Key': LAB_KEY, 'Content-Type': 'application/json' });
-    this.http.post<Practica>('/api/practicas', this.nueva, { headers }).subscribe({
+    this.http.post<Practica>('/api/practicas', this.nueva, { headers: this.headers() }).subscribe({
       next: () => {
         this.ok = 'Práctica registrada.';
         this.nueva = { organizacionId: null, estudianteId: null, titulo: '', estado: '' };
         this.load();
       },
-      error: err => {
-        if (err.status === 401) this.error = 'No autorizado (falta la clave de laboratorio).';
-        else if (err.status === 400) this.error = 'Datos inválidos: revise los campos y el estado.';
-        else this.error = 'Error al registrar la práctica.';
-      },
+      error: err => { this.error = this.mensajeError(err, 'registrar la práctica'); },
     });
+  }
+
+  cambiarEstado(p: Practica): void {
+    this.error = '';
+    this.ok = '';
+    const nuevoEstado = this.seleccion[p.id!];
+    this.http.patch<Practica>(`/api/practicas/${p.id}/estado`, { estado: nuevoEstado },
+      { headers: this.headers() }).subscribe({
+      next: () => { this.ok = `Estado de la práctica ${p.id} actualizado a ${nuevoEstado}.`; this.load(); },
+      error: err => { this.error = this.mensajeError(err, 'cambiar el estado'); },
+    });
+  }
+
+  private mensajeError(err: any, accion: string): string {
+    if (err.status === 401) return 'No autorizado (falta la clave de laboratorio).';
+    if (err.status === 400) return 'Datos inválidos: revise los campos y el estado.';
+    if (err.status === 404) return 'La práctica indicada no existe.';
+    return `Error al ${accion}.`;
   }
 
   nombreOrg(id: number | null | undefined): string {
