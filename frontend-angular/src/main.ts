@@ -1,161 +1,123 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
-import { HttpClient, HttpHeaders, provideHttpClient } from '@angular/common/http';
+import { HttpClient, provideHttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { forkJoin } from 'rxjs';
 
-interface Organizacion { id: number; nombre: string; sector?: string; }
-interface Estudiante { id: number; nombre: string; programa?: string; }
-interface Practica {
-  id?: number;
-  organizacionId: number | null;
-  estudianteId: number | null;
-  titulo: string;
-  estado: string;
-  creadaEn?: string;
+interface DeviceStatus {
+  deviceId: string; variable: string; unit: string; value: number;
+  quality: string; capturedAt: string; conexion: string; segundosDesdeUltima: number;
 }
-
-const LAB_KEY = 'lab-only-key'; // clave de laboratorio (no es un secreto real)
-const ESTADOS = ['POSTULADA', 'ACEPTADA', 'EN_CURSO', 'CONCLUIDA', 'RECHAZADA'];
+interface Reading {
+  deviceId: string; variable: string; unit: string; value: number;
+  quality: string; capturedAt: string;
+}
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   template: `
     <main>
-      <h1>PR10 — Prácticas profesionales</h1>
-      <p>Cliente Angular integrado con la API REST (Spring Boot) y PostgreSQL.</p>
+      <header>
+        <h1>PR10 — Monitoreo IoT (Web 4.0)</h1>
+        <p>Dashboard de telemetría simulada. Actualiza cada 3 s desde la API REST.</p>
+      </header>
+
+      <p class="error" *ngIf="error">{{ error }}</p>
 
       <section>
-        <h2>Registrar práctica</h2>
-        <form (ngSubmit)="crear()">
-          <label>Organización
-            <select name="org" [(ngModel)]="nueva.organizacionId" required>
-              <option [ngValue]="null" disabled>Seleccione…</option>
-              <option *ngFor="let o of organizaciones" [ngValue]="o.id">{{ o.nombre }}</option>
-            </select>
-          </label>
-          <label>Estudiante
-            <select name="est" [(ngModel)]="nueva.estudianteId" required>
-              <option [ngValue]="null" disabled>Seleccione…</option>
-              <option *ngFor="let e of estudiantes" [ngValue]="e.id">{{ e.nombre }}</option>
-            </select>
-          </label>
-          <label>Título <input name="tit" [(ngModel)]="nueva.titulo" required minlength="3"></label>
-          <label>Estado
-            <select name="edo" [(ngModel)]="nueva.estado" required>
-              <option value="" disabled>Seleccione…</option>
-              <option *ngFor="let s of estados" [value]="s">{{ s }}</option>
-            </select>
-          </label>
-          <button type="submit">Guardar</button>
-        </form>
-        <p class="error" *ngIf="error">{{ error }}</p>
-        <p class="ok" *ngIf="ok">{{ ok }}</p>
+        <h2>Dispositivos</h2>
+        <div class="tarjetas">
+          <article class="tarjeta" *ngFor="let d of dispositivos"
+                   [class.sel]="d.deviceId === seleccionado" (click)="verHistorial(d.deviceId)">
+            <div class="cab">
+              <strong>{{ d.deviceId }}</strong>
+              <span class="chip" [ngClass]="claseConexion(d)">{{ etiquetaConexion(d) }}</span>
+            </div>
+            <div class="valor">{{ d.value }} <span class="unidad">{{ d.unit }}</span></div>
+            <div class="meta">{{ d.variable }}</div>
+            <span class="estado" [ngClass]="'q-' + d.quality">{{ d.quality }}</span>
+          </article>
+          <p *ngIf="dispositivos.length === 0" class="vacio">Sin datos. Ejecuta el simulador.</p>
+        </div>
       </section>
 
       <section>
-        <h2>Prácticas registradas</h2>
-        <button (click)="load()">Actualizar</button>
+        <h2>Alertas activas <span class="conteo">({{ alertas.length }})</span></h2>
+        <table *ngIf="alertas.length > 0">
+          <tr><th>Dispositivo</th><th>Variable</th><th>Valor</th><th>Calidad</th><th>Hora</th></tr>
+          <tr *ngFor="let a of alertas" [ngClass]="'fila-' + a.quality">
+            <td>{{ a.deviceId }}</td><td>{{ a.variable }}</td>
+            <td>{{ a.value }} {{ a.unit }}</td><td>{{ a.quality }}</td>
+            <td>{{ a.capturedAt | date:'HH:mm:ss' }}</td>
+          </tr>
+        </table>
+        <p *ngIf="alertas.length === 0" class="vacio">Sin alertas: todas las lecturas están en rango normal.</p>
+      </section>
+
+      <section *ngIf="seleccionado">
+        <h2>Historial — {{ seleccionado }}</h2>
+        <svg *ngIf="historial.length > 1" class="spark" viewBox="0 0 320 80" preserveAspectRatio="none">
+          <polyline [attr.points]="puntos()" fill="none" stroke="#2563eb" stroke-width="2"/>
+        </svg>
         <table>
-          <tr>
-            <th>ID</th><th>Organización</th><th>Estudiante</th><th>Título</th>
-            <th>Estado</th><th>Cambiar estado</th>
+          <tr><th>Valor</th><th>Calidad</th><th>Fecha-hora</th></tr>
+          <tr *ngFor="let r of historial" [ngClass]="'fila-' + r.quality">
+            <td>{{ r.value }} {{ r.unit }}</td><td>{{ r.quality }}</td>
+            <td>{{ r.capturedAt | date:'yyyy-MM-dd HH:mm:ss' }}</td>
           </tr>
-          <tr *ngFor="let p of items">
-            <td>{{ p.id }}</td>
-            <td>{{ nombreOrg(p.organizacionId) }}</td>
-            <td>{{ nombreEst(p.estudianteId) }}</td>
-            <td>{{ p.titulo }}</td>
-            <td>{{ p.estado }}</td>
-            <td class="acciones">
-              <select [(ngModel)]="seleccion[p.id!]">
-                <option *ngFor="let s of estados" [value]="s">{{ s }}</option>
-              </select>
-              <button (click)="cambiarEstado(p)">Aplicar</button>
-            </td>
-          </tr>
-          <tr *ngIf="items.length === 0"><td colspan="6">Sin prácticas registradas.</td></tr>
         </table>
       </section>
     </main>
   `,
 })
-class App implements OnInit {
-  items: Practica[] = [];
-  organizaciones: Organizacion[] = [];
-  estudiantes: Estudiante[] = [];
-  estados = ESTADOS;
-  seleccion: Record<number, string> = {};
-  nueva: Practica = { organizacionId: null, estudianteId: null, titulo: '', estado: '' };
+class App implements OnInit, OnDestroy {
+  dispositivos: DeviceStatus[] = [];
+  alertas: Reading[] = [];
+  historial: Reading[] = [];
+  seleccionado = '';
   error = '';
-  ok = '';
+  private timer: any;
 
   constructor(private http: HttpClient) {}
 
-  ngOnInit(): void {
-    forkJoin({
-      orgs: this.http.get<Organizacion[]>('/api/organizaciones'),
-      ests: this.http.get<Estudiante[]>('/api/estudiantes'),
-    }).subscribe({
-      next: r => { this.organizaciones = r.orgs; this.estudiantes = r.ests; },
-      error: () => { this.error = 'No fue posible cargar los catálogos.'; },
+  ngOnInit(): void { this.refrescar(); this.timer = setInterval(() => this.refrescar(), 3000); }
+  ngOnDestroy(): void { if (this.timer) clearInterval(this.timer); }
+
+  refrescar(): void {
+    this.http.get<DeviceStatus[]>('/api/telemetry/latest').subscribe({
+      next: d => { this.dispositivos = d; this.error = ''; },
+      error: () => { this.error = 'No fue posible consultar la API de telemetría.'; },
     });
-    this.load();
+    this.http.get<Reading[]>('/api/telemetry/alerts').subscribe({ next: a => this.alertas = a });
+    if (this.seleccionado) this.verHistorial(this.seleccionado, false);
   }
 
-  private headers(): HttpHeaders {
-    return new HttpHeaders({ 'X-Lab-Key': LAB_KEY, 'Content-Type': 'application/json' });
+  verHistorial(deviceId: string, marcar = true): void {
+    if (marcar) this.seleccionado = deviceId;
+    this.http.get<Reading[]>('/api/telemetry/history/' + deviceId)
+      .subscribe({ next: h => this.historial = h });
   }
 
-  load(): void {
-    this.http.get<Practica[]>('/api/practicas').subscribe({
-      next: v => {
-        this.items = v;
-        v.forEach(p => { if (p.id != null) this.seleccion[p.id] = p.estado; });
-      },
-      error: () => { this.error = 'No fue posible consultar la API.'; },
-    });
+  claseConexion(d: DeviceStatus): string {
+    return d.conexion === 'DESCONECTADO' ? 'off' : 'on';
+  }
+  etiquetaConexion(d: DeviceStatus): string {
+    return d.conexion === 'DESCONECTADO'
+      ? 'Desconectado (' + d.segundosDesdeUltima + 's)' : 'En línea';
   }
 
-  crear(): void {
-    this.error = '';
-    this.ok = '';
-    this.http.post<Practica>('/api/practicas', this.nueva, { headers: this.headers() }).subscribe({
-      next: () => {
-        this.ok = 'Práctica registrada.';
-        this.nueva = { organizacionId: null, estudianteId: null, titulo: '', estado: '' };
-        this.load();
-      },
-      error: err => { this.error = this.mensajeError(err, 'registrar la práctica'); },
-    });
-  }
-
-  cambiarEstado(p: Practica): void {
-    this.error = '';
-    this.ok = '';
-    const nuevoEstado = this.seleccion[p.id!];
-    this.http.patch<Practica>(`/api/practicas/${p.id}/estado`, { estado: nuevoEstado },
-      { headers: this.headers() }).subscribe({
-      next: () => { this.ok = `Estado de la práctica ${p.id} actualizado a ${nuevoEstado}.`; this.load(); },
-      error: err => { this.error = this.mensajeError(err, 'cambiar el estado'); },
-    });
-  }
-
-  private mensajeError(err: any, accion: string): string {
-    if (err.status === 401) return 'No autorizado (falta la clave de laboratorio).';
-    if (err.status === 400) return 'Datos inválidos: revise los campos y el estado.';
-    if (err.status === 404) return 'La práctica indicada no existe.';
-    return `Error al ${accion}.`;
-  }
-
-  nombreOrg(id: number | null | undefined): string {
-    return this.organizaciones.find(o => o.id === id)?.nombre ?? String(id ?? '');
-  }
-  nombreEst(id: number | null | undefined): string {
-    return this.estudiantes.find(e => e.id === id)?.nombre ?? String(id ?? '');
+  // Sparkline del historial (más antiguo a la izquierda).
+  puntos(): string {
+    const datos = [...this.historial].reverse();
+    const vals = datos.map(r => r.value);
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const rango = max - min || 1;
+    return datos.map((r, i) => {
+      const x = (i / (datos.length - 1)) * 320;
+      const y = 76 - ((r.value - min) / rango) * 72;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
   }
 }
 
